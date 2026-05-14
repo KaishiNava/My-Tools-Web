@@ -1,3 +1,5 @@
+import formidable from "formidable"
+import fs from "fs"
 import FormData from "form-data"
 import fetch from "node-fetch"
 
@@ -7,68 +9,68 @@ export const config = {
   }
 }
 
-async function parse(req){
-
-  return new Promise((resolve,reject)=>{
-
-    const chunks=[]
-
-    req.on("data",(chunk)=>{
-      chunks.push(chunk)
-    })
-
-    req.on("end",()=>{
-      resolve(Buffer.concat(chunks))
-    })
-
-    req.on("error",reject)
-
-  })
-
-}
-
 export default async function handler(req,res){
 
-  try{
+  const form = formidable({})
 
-    const file = await parse(req)
+  form.parse(req, async(err,fields,files)=>{
 
-    const form = new FormData()
+    try{
 
-    form.append("reqtype","fileupload")
-
-    form.append("fileToUpload",file,{
-      filename:"upload.bin"
-    })
-
-    const upload = await fetch(
-      "https://catbox.moe/user/api.php",
-      {
-        method:"POST",
-        body:form,
-        headers:form.getHeaders()
+      if(err){
+        return res.status(500).json({
+          status:false,
+          message:"Form error"
+        })
       }
-    )
 
-    const result = await upload.text()
+      const file = files.file[0]
 
-    res.status(200).json({
-      status:true,
-      result:[
+      const buffer = fs.readFileSync(file.filepath)
+
+      const formData = new FormData()
+
+      formData.append(
+        "reqtype",
+        "fileupload"
+      )
+
+      formData.append(
+        "fileToUpload",
+        buffer,
+        file.originalFilename
+      )
+
+      const upload = await fetch(
+        "https://catbox.moe/user/api.php",
         {
-          host:"Catbox",
-          url:result
+          method:"POST",
+          body:formData,
+          headers:formData.getHeaders()
         }
-      ]
-    })
+      )
 
-  }catch(e){
+      const result = await upload.text()
 
-    res.status(500).json({
-      status:false,
-      message:"Upload Error"
-    })
+      res.status(200).json({
+        status:true,
+        result:[
+          {
+            host:"Catbox",
+            url:result
+          }
+        ]
+      })
 
-  }
+    }catch(e){
+
+      res.status(500).json({
+        status:false,
+        message:e.toString()
+      })
+
+    }
+
+  })
 
 }

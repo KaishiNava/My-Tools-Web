@@ -1,85 +1,79 @@
-import axios from "axios"
+import formidable from "formidable"
+import fs from "fs"
 import FormData from "form-data"
+import fetch from "node-fetch"
 
 export const config = {
   api: {
-    bodyParser: false
+    bodyParser:false
   }
-}
-
-async function parse(req){
-
-  return new Promise((resolve,reject)=>{
-
-    const chunks=[]
-
-    req.on("data",(chunk)=>{
-      chunks.push(chunk)
-    })
-
-    req.on("end",()=>{
-      resolve(Buffer.concat(chunks))
-    })
-
-    req.on("error",reject)
-
-  })
-
 }
 
 export default async function handler(req,res){
 
-  try{
+  const form = formidable({})
 
-    const body = await parse(req)
+  form.parse(req, async(err,fields,files)=>{
 
-    const upload = await axios.post(
-      "https://catbox.moe/user/api.php",
-      (()=>{
+    try{
 
-        const form = new FormData()
+      const file = files.file[0]
 
-        form.append("reqtype","fileupload")
-        form.append("fileToUpload",body,{
-          filename:"image.jpg"
-        })
+      const buffer = fs.readFileSync(file.filepath)
 
-        return form
+      const formData = new FormData()
 
-      })(),
-      {
-        headers:{
-          ...new FormData().getHeaders
+      formData.append(
+        "reqtype",
+        "fileupload"
+      )
+
+      formData.append(
+        "fileToUpload",
+        buffer,
+        file.originalFilename
+      )
+
+      const up = await fetch(
+        "https://catbox.moe/user/api.php",
+        {
+          method:"POST",
+          body:formData,
+          headers:formData.getHeaders()
         }
-      }
-    )
+      )
 
-    const imageUrl = upload.data
+      const imageUrl = await up.text()
 
-    const hd = await axios.get(
-      `https://api.obscuraworks.org/api/v2/tools/upscale?url=${encodeURIComponent(imageUrl)}`,
-      {
-        responseType:"arraybuffer",
-        headers:{
-          Authorization:"Bearer obs-N9GacfsE5SDVNuAMk4Wu"
+      const hd = await fetch(
+        `https://api.obscuraworks.org/api/v2/tools/upscale?url=${encodeURIComponent(imageUrl)}`,
+        {
+          headers:{
+            Authorization:"Bearer obs-N9GacfsE5SDVNuAMk4Wu"
+          }
         }
-      }
-    )
+      )
 
-    const base64 = Buffer.from(hd.data).toString("base64")
+      const arrayBuffer = await hd.arrayBuffer()
 
-    res.status(200).json({
-      status:true,
-      result:`data:image/jpeg;base64,${base64}`
-    })
+      const base64 = Buffer
+      .from(arrayBuffer)
+      .toString("base64")
 
-  }catch(e){
+      res.status(200).json({
+        status:true,
+        result:`data:image/jpeg;base64,${base64}`
+      })
 
-    res.status(500).json({
-      status:false,
-      message:"Error HD"
-    })
+    }catch(e){
 
-  }
+      res.status(500).json({
+        status:false,
+        message:e.toString()
+      })
+
+    }
+
+  })
 
 }

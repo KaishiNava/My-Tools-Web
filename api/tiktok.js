@@ -13,6 +13,9 @@ export default async function handler(req,res){
         params:{
           url,
           hd:1
+        },
+        headers:{
+          "Content-Type":"application/json"
         }
       }
     )
@@ -29,7 +32,7 @@ export default async function handler(req,res){
 
     res.status(500).json({
       status:false,
-      message:"TikTok Error"
+      message:e.toString()
     })
 
   }

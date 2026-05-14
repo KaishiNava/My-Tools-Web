@@ -20,7 +20,7 @@ export default async function handler(req,res){
 
     res.status(500).json({
       status:false,
-      message:"YTMP3 Error"
+      message:e.toString()
     })
 
   }
